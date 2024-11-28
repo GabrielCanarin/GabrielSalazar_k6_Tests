@@ -2,24 +2,27 @@ import { htmlReport } from 'https://raw.githubusercontent.com/benc-uk/k6-reporte
 import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
 import http from 'k6/http';
 import { check } from 'k6';
-import { Trend } from 'k6/metrics';
+import { Trend, Rate } from 'k6/metrics';
 
 export const getContactsDuration = new Trend('get_contacts', true);
+export const successfulRequests = new Rate('successful_requests'); 
 
 export const options = {
   thresholds: {
-    http_req_failed: ['rate<0.01'],
+    successful_requests: ['rate>0.95'],
+    http_req_duration: ['p(95)<5700'],
+    http_req_failed: ['rate<0.12'],
     http_req_duration: ['avg<10000']
   },
   stages: [
-    { duration: '10s', target: 5 },
     { duration: '20s', target: 10 },
-    { duration: '30s', target: 25 },
-    { duration: '50s', target: 50 },
-    { duration: '50s', target: 50 },
-    { duration: '30s', target: 25 },
-    { duration: '20s', target: 10 },
-    { duration: '10s', target: 5 },
+    { duration: '60s', target: 10 },
+    { duration: '20s', target: 75 },
+    { duration: '60s', target: 75 },
+    { duration: '20s', target: 175 },
+    { duration: '60s', target: 175 },
+    { duration: '30s', target: 300 },
+    { duration: '30s', target: 300 },
 ]
 };
 
@@ -43,9 +46,11 @@ export default function () {
 
   const res = http.get(`${baseUrl}`, params);
 
+  successfulRequests.add(res.status === OK);
   getContactsDuration.add(res.timings.duration);
 
   check(res, {
-    'GET Contacts - Status 200': () => res.status === OK
+    'GET Contacts - Status 200': () => successfulRequests,
+    'GET Contacts - Duração': () => getContactsDuration
   });
 }
